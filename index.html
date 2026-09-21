@@ -490,6 +490,16 @@
     best:     { 2: function(){ return ESRGANThick2x;  }, 4: function(){ return ESRGANThick4x;  } }
   };
 
+  // Esses modelos têm entrada de tamanho DINÂMICO (não fixo). Isso significa
+  // que, se a gente não passar um `patchSize` explícito, a biblioteca roda a
+  // imagem inteira de uma vez só, num único tensor gigante — trava a aba em
+  // imagens maiores e pode gerar resultado corrompido (tela preta) quando a
+  // GPU não aguenta o tamanho. Cada tier tem um tamanho de bloco calibrado
+  // ao custo do modelo: modelos mais pesados usam blocos menores para não
+  // estourar memória, mesmo que isso signifique mais blocos no total.
+  var PATCH_SIZE = { fast: 240, balanced: 176, best: 112 };
+  var PATCH_PADDING = 8;
+
   var state = {
     quality: 'best',
     scale: 4,
@@ -593,8 +603,8 @@
       previewRow.style.display = 'flex';
 
       var maxDim = Math.max(state.origW, state.origH);
-      if(maxDim > 2500){
-        warnBanner.textContent = 'Imagem grande: o processamento pode demorar mais. Considere usar "Rápido" para agilizar.';
+      if(maxDim > 1600){
+        warnBanner.textContent = 'Imagem grande: em "Máxima qualidade" o processamento pode levar alguns minutos (roda em muitos blocos pequenos para não travar a aba). Para um resultado mais rápido, use "Equilibrado" ou "Rápido".';
         warnBanner.style.display = 'block';
       } else {
         warnBanner.style.display = 'none';
@@ -689,7 +699,8 @@
 
       var firstProgress = true;
       var resultSrc = await upscaler.upscale(state.imgEl, {
-        padding: 4,
+        patchSize: PATCH_SIZE[state.quality],
+        padding: PATCH_PADDING,
         awaitNextFrame: true,
         progress: function(amount){
           if(firstProgress){
